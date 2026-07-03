@@ -1,0 +1,695 @@
+Practical 1: Amazon Scraping (Scrapy + MySQL)
+
+!pip install scrapy mysql-connector-python -q
+!apt-get -y install mysql-server -q > /dev/null
+!service mysql start
+!mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'yourpassword'; FLUSH PRIVILEGES;"
+!mysql -e "CREATE DATABASE IF NOT EXISTS amazon_db;"
+
+import scrapy
+import mysql.connector
+from scrapy.crawler import CrawlerProcess
+
+
+class MySQLPipeline:
+    def open_spider(self, spider):
+        self.conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="yourpassword",
+            database="amazon_db"
+        )
+        self.cursor = self.conn.cursor()
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS products (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title TEXT,
+                price VARCHAR(50),
+                rating VARCHAR(50),
+                link TEXT
+            )
+        """)
+
+    def process_item(self, item, spider):
+        self.cursor.execute("""
+            INSERT INTO products (title, price, rating, link)
+            VALUES (%s, %s, %s, %s)
+        """, (
+            item.get("title"),
+            item.get("price"),
+            item.get("rating"),
+            item.get("link")
+        ))
+        self.conn.commit()
+        return item
+
+    def close_spider(self, spider):
+        self.conn.close()
+
+
+class AmazonSpider(scrapy.Spider):
+    name = "amazon_spider"
+    start_urls = ["https://www.amazon.in/s?k=headphones"]
+
+    custom_settings = {
+        "ITEM_PIPELINES": {"__main__.MySQLPipeline": 300},
+        "DOWNLOAD_DELAY": 2,
+        "USER_AGENT": "Mozilla/5.0",
+        "ROBOTSTXT_OBEY": False,
+        "CONCURRENT_REQUESTS": 1,
+    }
+
+    def parse(self, response):
+        products = response.css("div.s-main-slot div.s-result-item")
+        for product in products[:5]:
+            yield {
+                "title": product.css("h2 span::text").get(),
+                "price": product.css(".a-price-whole::text").get(),
+                "rating": product.css(".a-icon-alt::text").get(),
+                "link": response.urljoin(product.css("h2 a::attr(href)").get())
+            }
+
+
+process = CrawlerProcess()
+process.crawl(AmazonSpider)
+process.start()
+
+print("\nDone. Check the 'products' table inside the 'amazon_db' MySQL database.")
+------------------------------------------------------------------------------------
+Practical 2: Social Media Data (Simulated Twitter)
+
+import sys
+print("Running Python:", sys.executable)
+
+import pandas as pd
+
+data = [
+    ["2024-01-01", "user1", "Machine learning is amazing"],
+    ["2024-01-02", "user2", "AI will change the world"],
+    ["2024-01-03", "user3", "Python is best for data science"],
+    ["2024-01-04", "user4", "Deep learning is powerful"],
+    ["2024-01-05", "user5", "Data science is future"],
+    ["2024-01-06", "user6", "Big data is transforming industries"],
+    ["2024-01-07", "user7", "Neural networks are very powerful"],
+    ["2024-01-08", "user8", "AI will replace many jobs"],
+    ["2024-01-09", "user9", "Python is easy and popular"],
+    ["2024-01-10", "user10", "Technology is evolving rapidly"]
+]
+
+df = pd.DataFrame(data, columns=["Date", "User", "Tweet"])
+
+print("\n================ TWEETS DATA ================\n")
+print(df)
+
+df.to_csv("tweets.csv", index=False, encoding="utf-8")
+print("\nData successfully saved to 'tweets.csv'")
+
+--------------------------------------------------------------------------------------
+Practical 3: PageRank
+import random
+
+pages = {
+    "page1": ["page2", "page3"],
+    "page2": ["page3"],
+    "page3": ["page1"],
+    "page4": ["page1", "page3"]
+}
+
+damping_factor = 0.85
+num_steps = 10000
+
+visit_count = {page: 0 for page in pages}
+current_page = random.choice(list(pages.keys()))
+
+for _ in range(num_steps):
+    visit_count[current_page] += 1
+    if random.random() < damping_factor and pages[current_page]:
+        current_page = random.choice(pages[current_page])
+    else:
+        current_page = random.choice(list(pages.keys()))
+
+page_rank = {page: count / num_steps for page, count in visit_count.items()}
+
+print("PageRank Results (Random Walk):")
+for page, rank in page_rank.items():
+    print(f"{page}: {rank:.4f}")
+--------------------------------------------------------------------------------------
+Practical 4: Spam Classifier
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report
+
+data = {
+    'label': ['spam', 'ham', 'spam', 'ham', 'spam', 'ham'],
+    'message': [
+        'Win money now!!!!',
+        'Hello, how are you?',
+        'Claim your free prize',
+        "Let's meet tomorrow",
+        'Exclusive offer just for you',
+        'Good morning friend'
+    ]
+}
+
+df = pd.DataFrame(data)
+df['label_num'] = df['label'].map({'ham': 0, 'spam': 1})
+
+X_train, X_test, y_train, y_test = train_test_split(
+    df['message'], df['label_num'], test_size=0.3, random_state=42
+)
+
+vectorizer = CountVectorizer()
+X_train_count = vectorizer.fit_transform(X_train)
+X_test_count = vectorizer.transform(X_test)
+
+model = MultinomialNB()
+model.fit(X_train_count, y_train)
+
+y_pred = model.predict(X_test_count)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+
+
+def predict_spam(message):
+    message_count = vectorizer.transform([message])
+    prediction = model.predict(message_count)
+    return "Spam" if prediction[0] == 1 else "Not Spam"
+
+
+test_msg = "Congratulations! You won a free ticket"
+print("\nMessage:", test_msg)
+print("Prediction:", predict_spam(test_msg))
+------------------------------------------------------------------------------------
+Practical 5: Text Mining and Webpage Meta Info
+import sys
+print(sys.executable)
+
+import requests
+from bs4 import BeautifulSoup
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import string
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('punkt_tab')
+
+sample_html = """
+<html>
+<head>
+<title>Data Science Overview</title>
+<meta name="description" content="An introduction to data science and machine learning.">
+<meta name="keywords" content="data science, machine learning, python, statistics">
+</head>
+<body>
+<h1>What is Data Science?</h1>
+<p>Data science is an interdisciplinary field that uses scientific methods,
+processes, algorithms and systems to extract knowledge from data.
+Data science involves statistics, machine learning, and data analysis.</p>
+<p>Python is one of the most popular programming languages used in data science.</p>
+</body>
+</html>
+"""
+with open("test.html", "w", encoding="utf-8") as f:
+    f.write(sample_html)
+
+
+def get_webpage_content(source, is_url=True):
+    if is_url:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(source, headers=headers, verify=False)
+        return response.text
+    else:
+        with open(source, 'r', encoding='utf-8') as file:
+            return file.read()
+
+
+def extract_meta_info(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    title = soup.title.string if soup.title else "No Title"
+    description = ""
+    keywords = ""
+    for meta in soup.find_all("meta"):
+        if meta.get("name") == "description":
+            description = meta.get("content", "")
+        if meta.get("name") == "keywords":
+            keywords = meta.get("content", "")
+    return title, description, keywords
+
+
+def preprocess_text(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    for script in soup(["script", "style"]):
+        script.decompose()
+    text = soup.get_text()
+    tokens = word_tokenize(text.lower())
+    stop_words = set(stopwords.words('english'))
+    clean_tokens = [
+        word for word in tokens
+        if word.isalpha() and word not in stop_words
+    ]
+    return clean_tokens
+
+
+def word_frequency(tokens):
+    freq = {}
+    for word in tokens:
+        freq[word] = freq.get(word, 0) + 1
+    return sorted(freq.items(), key=lambda x: x[1], reverse=True)
+
+
+def analyze_webpage(source, is_url=True, top_n=10):
+    html = get_webpage_content(source, is_url)
+    title, description, keywords = extract_meta_info(html)
+
+    print("\n--- META INFORMATION ---")
+    print("Title:", title)
+    print("Description:", description)
+    print("Keywords:", keywords)
+
+    tokens = preprocess_text(html)
+    print("\n--- SAMPLE CLEAN TOKENS ---")
+    print(tokens[:20])
+
+    freq = word_frequency(tokens)
+    print(f"\n--- TOP {top_n} FREQUENT WORDS ---")
+    for word, count in freq[:top_n]:
+        print(word, ":", count)
+
+    with open("output.txt", "w", encoding="utf-8") as f:
+        f.write("Title: " + title + "\n")
+        f.write("Description: " + description + "\n")
+        f.write("Keywords: " + keywords + "\n\n")
+        f.write("Top Words:\n")
+        for word, count in freq[:top_n]:
+            f.write(f"{word}: {count}\n")
+
+    print("\nResults saved to output.txt")
+
+
+analyze_webpage("test.html", is_url=False)
+-============================================================================================================================
+Practical 6: Apriori Algorithm
+
+from itertools import combinations
+
+transactions = [
+    {'Milk', 'Bread', 'Butter'},
+    {'Beer', 'Bread'},
+    {'Milk', 'Bread', 'Beer', 'Butter'},
+    {'Bread', 'Butter'},
+    {'Milk', 'Bread', 'Beer'}
+]
+
+min_support = 0.4
+
+
+def get_support(itemset, transactions):
+    count = 0
+    for transaction in transactions:
+        if itemset.issubset(transaction):
+            count += 1
+    return count / len(transactions)
+
+
+def generate_candidates(prev_frequent, k):
+    candidates = []
+    prev_list = list(prev_frequent)
+    for i in range(len(prev_list)):
+        for j in range(i + 1, len(prev_list)):
+            union_set = prev_list[i].union(prev_list[j])
+            if len(union_set) == k:
+                candidates.append(union_set)
+    return candidates
+
+
+def apriori(transactions, min_support):
+    single_items = set()
+    for transaction in transactions:
+        for item in transaction:
+            single_items.add(frozenset([item]))
+
+    frequent_itemsets = []
+
+    L1 = set()
+    for item in single_items:
+        support = get_support(item, transactions)
+        if support >= min_support:
+            L1.add(item)
+    frequent_itemsets.append(L1)
+
+    k = 2
+    while True:
+        candidates = generate_candidates(frequent_itemsets[-1], k)
+        Lk = set()
+        for candidate in candidates:
+            support = get_support(candidate, transactions)
+            if support >= min_support:
+                Lk.add(candidate)
+        if not Lk:
+            break
+        frequent_itemsets.append(Lk)
+        k += 1
+
+    return frequent_itemsets
+
+
+result = apriori(transactions, min_support)
+
+for i, level in enumerate(result):
+    print(f"Frequent {i+1}-itemsets:")
+    for itemset in level:
+        print(set(itemset))
+    print()
+=======================================================================================================
+
+Practical 7: Basic Keyword Crawler
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+
+def contains_keyword(text, keywords):
+    text = text.lower()
+    return any(keyword.lower() in text for keyword in keywords)
+
+
+def crawl(seed_url, keywords, max_pages=10):
+    visited = set()
+    to_visit = [seed_url]
+
+    print(f"\nSearching for keywords: {keywords}\n")
+
+    while to_visit and len(visited) < max_pages:
+        url = to_visit.pop(0)
+        if url in visited:
+            continue
+        try:
+            print(f"Crawling: {url}")
+            response = requests.get(url, headers=HEADERS, timeout=5)
+            if response.status_code != 200:
+                continue
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            text = soup.get_text()
+
+            if contains_keyword(text, keywords):
+                print(f"Keyword found at: {url}")
+
+            visited.add(url)
+
+            for link in soup.find_all('a', href=True):
+                absolute_link = urljoin(url, link["href"])
+                if urlparse(absolute_link).scheme in ['http', 'https']:
+                    if absolute_link not in visited:
+                        to_visit.append(absolute_link)
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+    print("\nCrawling finished.")
+
+
+if __name__ == "__main__":
+    seed = input("Enter seed URL: ")
+    keywords = input("Enter keywords (comma separated): ").split(',')
+    crawl(seed, keywords, max_pages=15)
+========================================================================================================
+Practical 8: Focused Crawler for Local Search
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+import time
+
+
+class FocusedCrawler:
+    def __init__(self, seed_urls, topic_keywords, location_keywords=None, max_depth=2):
+        self.seed_urls = seed_urls
+        self.topic_keywords = [kw.lower() for kw in topic_keywords]
+        self.location_keywords = [kw.lower() for kw in location_keywords] if location_keywords else []
+        self.max_depth = max_depth
+        self.visited = set()
+        self.relevant_pages = []
+
+    def is_relevant(self, text):
+        text = text.lower()
+        topic_match = any(keyword in text for keyword in self.topic_keywords)
+        if self.location_keywords:
+            location_match = any(loc in text for loc in self.location_keywords)
+        else:
+            location_match = True
+        return topic_match and location_match
+
+    def fetch_page(self, url):
+        try:
+            headers = {"User-Agent": "Mozilla/5.0"}
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                return response.text
+        except Exception:
+            return None
+        return None
+
+    def extract_links(self, html, base_url):
+        soup = BeautifulSoup(html, "html.parser")
+        links = set()
+        for tag in soup.find_all("a", href=True):
+            href = tag["href"]
+            full_url = urljoin(base_url, href)
+            if urlparse(full_url).scheme in ["http", "https"]:
+                links.add(full_url)
+        return links
+
+    def crawl(self):
+        queue = [(url, 0) for url in self.seed_urls]
+
+        while queue:
+            current_url, depth = queue.pop(0)
+            if current_url in self.visited or depth > self.max_depth:
+                continue
+
+            print(f"Crawling: {current_url} (Depth: {depth})")
+            self.visited.add(current_url)
+
+            html = self.fetch_page(current_url)
+            if not html:
+                continue
+
+            soup = BeautifulSoup(html, "html.parser")
+            text = soup.get_text()
+
+            if self.is_relevant(text):
+                print(f"Relevant: {current_url}")
+                self.relevant_pages.append(current_url)
+
+            links = self.extract_links(html, current_url)
+            for link in links:
+                if link not in self.visited:
+                    queue.append((link, depth + 1))
+
+            time.sleep(1)
+
+        return self.relevant_pages
+
+
+if __name__ == "__main__":
+    seed_urls = ["https://example.com"]
+    topic_keywords = ["restaurant", "food", "cafe"]
+    location_keywords = ["mumbai", "andheri", "bandra"]
+
+    crawler = FocusedCrawler(seed_urls, topic_keywords, location_keywords, max_depth=2)
+    results = crawler.crawl()
+
+    print("\nRelevant Pages Found:")
+    for url in results:
+        print(url)
+=======================================================================================================
+Practical 9: Deep Search Plagiarism Detection
+import nltk
+import string
+import requests
+from bs4 import BeautifulSoup
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+
+
+def preprocess(text):
+    text = text.lower()
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    tokens = nltk.word_tokenize(text)
+    return " ".join(tokens)
+
+
+def load_documents():
+    with open("doc1.txt", "r", encoding="utf-8") as f:
+        doc1 = f.read()
+    with open("doc2.txt", "r", encoding="utf-8") as f:
+        doc2 = f.read()
+    return doc1, doc2
+
+
+def check_plagiarism(doc1, doc2):
+    docs = [preprocess(doc1), preprocess(doc2)]
+    vectorizer = TfidfVectorizer()
+    tfidf = vectorizer.fit_transform(docs)
+    score = cosine_similarity(tfidf[0], tfidf[1])[0][0]
+    return score
+
+
+def search_online(query):
+    try:
+        url = "https://duckduckgo.com/html/"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, params={"q": query}, timeout=5)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        links = []
+        for a in soup.find_all("a"):
+            href = a.get("href")
+            if href and href.startswith("http") and "duckduckgo" not in href:
+                links.append(href)
+
+        results = []
+        for link in links[:3]:
+            try:
+                page = requests.get(link, headers=headers, timeout=5)
+                page_soup = BeautifulSoup(page.text, "html.parser")
+                for tag in page_soup(["script", "style", "noscript"]):
+                    tag.extract()
+                text = page_soup.get_text(separator=" ", strip=True)
+                clean_lines = [l for l in text.split(". ") if len(l) > 40]
+                results.append({"url": link, "content": ". ".join(clean_lines[:2])})
+            except Exception:
+                continue
+
+        return results if results else [{"url": "No valid source found", "content": "No readable content available"}]
+    except Exception:
+        return [{"url": "Error", "content": "Failed to fetch results"}]
+
+
+def sentence_analysis(doc1, doc2):
+    s1 = nltk.sent_tokenize(doc1)
+    s2 = nltk.sent_tokenize(doc2)
+
+    print("\n--- Sentence Level Similarity ---")
+    vectorizer = TfidfVectorizer()
+    for a in s1:
+        for b in s2:
+            tfidf = vectorizer.fit_transform([a, b])
+            score = cosine_similarity(tfidf[0], tfidf[1])[0][0]
+            if score > 0.5:
+                print(f"\nMatch Found ({score*100:.2f}%)")
+                print("Doc1:", a)
+                print("Doc2:", b)
+
+
+def deep_search(text):
+    sentences = nltk.sent_tokenize(text)
+
+    print("\n==============================")
+    print(" DEEP WEB SEARCH ANALYSIS")
+    print("==============================")
+
+    for sentence in sentences[:3]:
+        print(f"\nQuery: {sentence}")
+        results = search_online(sentence[:60])
+        for r in results:
+            print("\nSource URL:", r["url"])
+            print("Content Preview:", r["content"])
+
+
+def main():
+    with open("doc1.txt", "w", encoding="utf-8") as f:
+        f.write("The quick brown fox jumps over the lazy dog. This is the first document.")
+    with open("doc2.txt", "w", encoding="utf-8") as f:
+        f.write("A quick brown fox jumps over a lazy dog. This is the second document, very similar.")
+
+    doc1, doc2 = load_documents()
+
+    score = check_plagiarism(doc1, doc2)
+    print("\n==============================")
+    print(f" PLAGIARISM SCORE: {score*100:.2f}%")
+    print("==============================")
+
+    if score > 0.7:
+        print("High Plagiarism Detected")
+    elif score > 0.4:
+        print("Moderate Plagiarism Detected")
+    else:
+        print("Low Plagiarism Detected")
+
+    sentence_analysis(doc1, doc2)
+    deep_search(doc1)
+
+
+if __name__ == "__main__":
+    main()
+======================================================================================================
+Practical 10: Sentiment Analysis with Visualization
+
+import sys
+print(sys.executable)
+
+import nltk
+import string
+import pandas as pd
+from textblob import TextBlob
+import matplotlib.pyplot as plt
+
+nltk.download('punkt', quiet=True)
+
+reviews = [
+    "The product is amazing and works perfectly!",
+    "Worst experience ever, very disappointed.",
+    "It's okay, not great but not bad either.",
+    "Absolutely fantastic service!",
+    "Terrible quality, broke after one use.",
+    "I love it, highly recommend!",
+    "Not worth the price.",
+    "Pretty decent overall."
+]
+
+df = pd.DataFrame(reviews, columns=["Review"])
+
+
+def get_sentiment(text):
+    analysis = TextBlob(text)
+    polarity = analysis.sentiment.polarity
+    if polarity > 0:
+        return "Positive"
+    elif polarity < 0:
+        return "Negative"
+    else:
+        return "Neutral"
+
+
+df["Sentiment"] = df["Review"].apply(get_sentiment)
+
+sentiment_counts = df["Sentiment"].value_counts()
+
+print("\n================ SENTIMENT RESULTS ================")
+print(df)
+
+print("\n============= SENTIMENT COUNTS =============")
+print(sentiment_counts)
+
+sentiment_counts.plot(kind="bar")
+plt.title("Sentiment Analysis of Customer Reviews")
+plt.xlabel("Sentiment")
+plt.ylabel("Number of Reviews")
+plt.tight_layout()
+plt.show()
+
+=======================================================================================================
