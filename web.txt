@@ -693,3 +693,108 @@ plt.tight_layout()
 plt.show()
 
 =======================================================================================================
+
+Practical 1: Amazon Scraping (Scrapy + MySQL)
+python# Install (Colab commands, not import)
+!pip install scrapy mysql-connector-python
+!apt-get -y install mysql-server
+
+# Imports
+import scrapy
+import mysql.connector
+from scrapy.crawler import CrawlerProcess
+==============================================================================================================================
+Practical 2: Social Media Scraping (Simulated Twitter)
+pythonimport sys
+import pandas as pd
+(koi extra install nahi chahiye — pandas Colab mein pehle se hota hai)
+
+=====================================================================================
+
+Practical 3: PageRank
+pythonimport random
+(built-in module, install ki zaroorat nahi)
+
+===========================================================================================
+
+Practical 4: Spam Classifier
+pythonimport pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report
+(scikit-learn Colab mein pehle se installed hota hai)
+
+===========================================================================
+
+Practical 5: Text Mining / Webpage Meta Info
+python!pip install requests beautifulsoup4 nltk
+
+import sys
+import requests
+from bs4 import BeautifulSoup
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import string
+import urllib3
+
+# Extra NLTK data downloads (not pip installs)
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('punkt_tab')
+
+=========================================================================
+
+Practical 6: Apriori Algorithm
+pythonfrom itertools import combinations
+(built-in, install ki zaroorat nahi)
+
+========================================================
+
+Practical 7: Basic Keyword Crawler
+python!pip install requests beautifulsoup4
+
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+================================================================
+
+Practical 8: Focused Crawler (Local Search)
+python!pip install requests beautifulsoup4
+
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+import time
+
+==========================================================================
+
+Practical 9: Deep Search Plagiarism Detection
+python!pip install requests beautifulsoup4 scikit-learn nltk
+
+import nltk
+import string
+import requests
+from bs4 import BeautifulSoup
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Extra NLTK data downloads
+nltk.download('punkt')
+nltk.download('punkt_tab')
+
+==================================================================
+
+Practical 10: Sentiment Analysis with Visualization
+python!pip install textblob pandas matplotlib
+
+import sys
+import nltk
+import string
+import pandas as pd
+from textblob import TextBlob
+import matplotlib.pyplot as plt
+
+nltk.download('punkt')
